@@ -1,0 +1,1139 @@
+Parameter:
+ # DbSubnetIpBlocks:
+ #  Description: "Comma-delimited list of three CIDR blocks"
+ #  Type: CommaDelimitedList
+    Default: "10.0.48.0/24, 10.0.112.0/24, 10.0.176.0/24"MyVPC1:
+ MyVPC1
+  Type: AWS::EC2::VPC
+  Description:Choose the VPC for Instance
+ Subnet1Cidr
+   Type: String
+   Description: Enter the subnet1Cidr Range
+   AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+ MyAZ1
+   Type: AWS::EC2::AvailabilityZone::Name
+   Description: Choose the  AZ's
+ MyInstanceType
+   Type: String
+   Descripition: Choose the instance type
+   AllowedValues: 
+    - t2.micro
+    - t2.nano
+    - t2.small
+ Envtype:
+   Type: String
+   Default: test
+   AllowedValues:
+    - prod
+    - test
+ Securitygroupip:
+   Type: String
+   Description: Enter the IP Range
+   AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+   Default: 0.0.0.0/0
+ Securitygroupport:
+   Type: Number
+   Description: Enter the securityport
+   Minvalue: 0
+   MaxValue: 33656
+Mappings:
+  AWSRegion:
+     useast-1a:
+       64:ami-xxxxx
+Condition:
+Enivronment: !Equals [ !Ref Envtype, prod]
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - SubnetID
+          - SecurityGroupID
+      - Label:
+          default: "Amazon EC2 Configuration"
+        Parameters:
+          - InstanceType
+Resource:
+  MyInstance:
+   Type: AWS::EC2::Instance
+   Properties:
+     ImageId:
+         !FindInMap [AWSRegion, 'AWS::Region',64]
+      KeyPair:
+         !Ref MyKeypair
+      InstanceType:
+         !Ref MyInstanceType
+      SubnetId:
+         !Ref MySubnet
+      SecurityGroups:
+        - !Ref SecurityGroup1
+  MySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Ref MyAZ1
+      VpcId: !Ref MyVPC1
+      CidrBlock: !Ref Subnet1Cidr
+  SecurityGroup1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+     GroupDescription: Webserver1
+     SecurityGroupIngress:
+      - CidrIp: !Ref Securitygroupip
+        FromPort: !Ref Securitygroupport
+        ToPort: !Ref Securitygroupport
+        IpProtocol: tcp
+     VpcId: !Ref MyVPC1
+  MountPoint:
+   Type: AWS::EC2::VolumeAttachment
+   Conditions: Enivronment
+   Properties:
+    InstanceId: !Ref MyInstance
+    VolumeId: !Ref NewVolume
+    Device: /dev/sdh
+ NewVolume:
+    Type: AWS::EC2::Volume
+    Conditions: Enivronment
+    Properties
+     Size: 1
+     AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone
+Outputs:
+  VpcId:
+    Value: !Ref MyVPC1
+  InstanceId:
+    Value: !Ref MyInstance
+  SecurityGroupId
+    Value: !Ref SecurityGroup1
+
+
+####################################################################################################################################################
+
+
+Resources:
+  MyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-1a
+      ImageId: ami-0742b4e673072066f
+      InstanceType: t2.micro
+      SecurityGroups:
+        - !Ref SSHSecurityGroup
+        - !Ref ServerSecurityGroup
+
+  # an elastic IP for our instance
+  MyEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref MyInstance
+
+  # our EC2 security group
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+
+  # our second EC2 security group
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: allow connections from specified CIDR ranges
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 192.168.1.1/32
+############################################################
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName: "insert-some-random-string-here-12345233"
+
+############################################################
+Parameters:
+  SecurityGroupDescription:
+    Description: Security Group Description (Simple parameter)
+    Type: String
+
+  SecurityGroupPort:
+    Description: Simple Description of a Number Parameter, with MinValue and MaxValue
+    Type: Number
+    MinValue: 10
+    MaxValue: 65535
+
+  InstanceType:
+    Description: WebServer EC2 instance type (has default, AllowedValues)
+    Type: String
+    Default: t2.small
+    AllowedValues:
+      - t1.micro
+      - t2.nano
+      - t2.micro
+      - t2.small
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  DBPwd:
+    NoEcho: true
+    Description: The database admin account password (won't be echoed)
+    Type: String
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances. Linked to AWS Parameter
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+  SecurityGroupIngressCIDR:
+    Description: The IP address range that can be used to communicate to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  MyVPC:
+    Description: VPC to operate in
+    Type: AWS::EC2::VPC::Id
+
+  # MySubnetIDs:
+  # Description: Subnet IDs that is a List of Subnet Id
+  # Type: "List<AWS::EC2::Subnet::Id>"
+
+  DbSubnetIpBlocks:
+    Description: "Comma-delimited list of three CIDR blocks"
+    Type: CommaDelimitedList
+    Default: "10.0.48.0/24, 10.0.112.0/24, 10.0.176.0/24"
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      #we reference the InstanceType parameter
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-05c3dc660cb6907f0
+      # here we reference an internal CloudFormation resource
+      SubnetId: !Ref DbSubnet1
+
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref SecurityGroupDescription
+      SecurityGroupIngress:
+        - CidrIp: !Ref SecurityGroupIngressCIDR
+          FromPort: !Ref SecurityGroupPort
+          ToPort: !Ref SecurityGroupPort
+          IpProtocol: tcp
+      VpcId: !Ref MyVPC
+
+  DbSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      # the select function allows us to select across a list
+      CidrBlock: !Select [0, !Ref DbSubnetIpBlocks]
+
+  DbSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      # the select function allows us to select across a list
+      CidrBlock: !Select [1, !Ref DbSubnetIpBlocks]
+      
+  DbSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      # the select function allows us to select across a list
+      CidrBlock: !Select [2, !Ref DbSubnetIpBlocks]
+################################################################################
+
+Parameters:
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /dev/ec2/instanceType
+    
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref ImageId
+################################################################################
+Parameters:  
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+
+  # the EC2 instance will be created after the S3 bucket
+  MyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t2.micro
+    DependsOn: MyS3Bucket
+###############################################################################3
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+
+Parameters:
+  BucketName:
+    Type: String
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+ ###############################################################################3
+
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: String
+    AllowedValues: [development, production]
+    ConstraintDescription: must be development or production
+
+Mappings:
+  AWSRegionArch2AMI:
+    af-south-1:
+      HVM64: ami-06db08e8636583118
+    ap-east-1:
+      HVM64: ami-0921e2da2f22f9617
+    ap-northeast-1:
+      HVM64: ami-06098fd00463352b6
+    ap-northeast-2:
+      HVM64: ami-07464b2b9929898f8
+    ap-northeast-3:
+      HVM64: ami-0b96303a469fa0678
+    ap-south-1:
+      HVM64: ami-0bcf5425cdc1d8a85
+    ap-southeast-1:
+      HVM64: ami-03ca998611da0fe12
+    ap-southeast-2:
+      HVM64: ami-06202e06492f46177
+    ca-central-1:
+      HVM64: ami-09934b230a2c41883
+    eu-central-1:
+      HVM64: ami-0db9040eb3ab74509
+    eu-north-1:
+      HVM64: ami-02baf2b4223a343e8
+    eu-south-1:
+      HVM64: ami-081e7f992eee19465
+    eu-west-1:
+      HVM64: ami-0ffea00000f287d30
+    eu-west-2:
+      HVM64: ami-0fbec3e0504ee1970
+    eu-west-3:
+      HVM64: ami-00dd995cb6f0a5219
+    me-south-1:
+      HVM64: ami-0502022ce8bfa56a9
+    sa-east-1:
+      HVM64: ami-0c27c96aaa148ba6d
+    us-east-1:
+      HVM64: ami-0742b4e673072066f
+    us-east-2:
+      HVM64: ami-05d72852800cbf29e
+    us-west-1:
+      HVM64: ami-0577b787189839998
+    us-west-2:
+      HVM64: ami-0518bb0e75d3619ca
+  EnvironmentToInstanceType:
+    development:
+      instanceType: t2.micro
+    # we want a bigger instance type in production
+    production:
+      instanceType: t2.small
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !FindInMap [EnvironmentToInstanceType, !Ref 'EnvironmentName', instanceType]
+      # Note we use the pseudo parameter AWS::Region
+      ImageId: !FindInMap [AWSRegionArch2AMI, !Ref 'AWS::Region', HVM64]
+###############################################################################3
+          
+Resources:
+  # here we define a SSH security group that will be used in the entire company
+  MyCompanyWideSSHSecurityGroup:
+    # http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        # we have a lot of rules because it's a perfect security group
+        # finance team network
+      - CidrIp: 10.0.48.0/24
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+        # marketing team network
+      - CidrIp: 10.0.112.0/24
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+        # application team support network
+      - CidrIp: 10.0.176.0/24
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+
+Outputs:
+  StackSSHSecurityGroup:
+    Description: The SSH Security Group for our Company
+    Value: !Ref MyCompanyWideSSHSecurityGroup
+    Export:
+      Name: SSHSecurityGroup
+
+
+Parameters:  
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  MySecureInstance:
+    # http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t2.micro
+      SecurityGroups:
+        # we reference the output here, using the Fn::ImportValue function
+        - !ImportValue SSHSecurityGroup
+
+###############################################################################
+
+Parameters:  
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  EnvType:
+    Description: Environment type.
+    Default: test
+    Type: String
+    AllowedValues:
+      - prod
+      - test
+    ConstraintDescription: must specify prod or test.
+
+Conditions:
+  CreateProdResources: !Equals [ !Ref EnvType, prod ]
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t2.micro
+      
+  MountPoint:
+    Type: AWS::EC2::VolumeAttachment
+    Condition: CreateProdResources
+    Properties:
+      InstanceId:
+        !Ref EC2Instance
+      VolumeId:
+        !Ref NewVolume
+      Device: /dev/sdh
+
+  NewVolume:
+    Type: AWS::EC2::Volume
+    Condition: CreateProdResources
+    Properties:
+      Size: 1
+      AvailabilityZone:
+        !GetAtt EC2Instance.AvailabilityZone
+
+Outputs:
+  VolumeId:
+    Condition: CreateProdResources
+    Value:
+      !Ref NewVolume
+###############################################################################
+
+
+Parameters:
+  InstanceType:
+    Description: EC2 instance type.
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - m3.medium
+    - m3.large
+    - m3.xlarge
+    - m3.2xlarge
+  SubnetID:
+    Description: Subnet ID
+    Type: AWS::EC2::Subnet::Id
+  SecurityGroupID:
+    Description: Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-1a
+      ImageId: ami-0742b4e673072066f
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref SecurityGroupID
+      SubnetId: !Ref SubnetID
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - SubnetID
+          - SecurityGroupID
+      - Label:
+          default: "Amazon EC2 Configuration"
+        Parameters:
+          - InstanceType
+    ParameterLabels:
+      SubnetID:
+        default: "Which subnet should this be deployed to?"
+
+
+###############################################################################
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.small
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+      
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Rules:
+  ProdInstanceType:
+    RuleCondition: !Equals 
+      - !Ref Environment
+      - prod
+    Assertions:
+      - Assert:
+          !Equals [t2.small, !Ref InstanceType]
+        AssertDescription: 'For a production environment, the instance type must be t2.small'
+
+  DevInstanceType:
+    RuleCondition: !Equals 
+      - !Ref Environment
+      - dev
+    Assertions:
+      # Assert with Or
+      # - Assert:
+      #     'Fn::Or':
+      #       - !Equals [!Ref InstanceType, t2.nano]
+      #       - !Equals [!Ref InstanceType, t2.micro]
+      # Assert with Contains
+      - Assert:
+          'Fn::Contains':
+            - - t2.nano
+              - t2.micro
+            - !Ref InstanceType
+        AssertDescription: 'For a development environment, the instance type must be t2.nano or t2.micro'
+  
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref ImageId
+###############################################################################
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Sample Template for CFN Init
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  MyS3BucketName:
+    Description: Name of an existing bucket to download files from
+    Type: String
+
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access via port 80 and SSH access via port 22
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref SSHLocation
+
+  WebServerHost:
+    Type: AWS::EC2::Instance
+    Metadata:
+      Comment: Install a simple PHP application
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              httpd: []
+              php: []
+          groups:
+            apache: {}
+          users:
+            "apache":
+              groups:
+                - "apache"
+          sources:
+            "/home/ec2-user/aws-cli": "https://github.com/aws/aws-cli/tarball/master"
+          files:
+            "/tmp/cwlogs/apacheaccess.conf":
+              content: !Sub |
+                [general]
+                state_file= /var/awslogs/agent-state
+                [/var/log/httpd/access_log]
+                file = /var/log/httpd/access_log
+                log_group_name = ${AWS::StackName}
+                log_stream_name = {instance_id}/apache.log
+                datetime_format = %d/%b/%Y:%H:%M:%S
+              mode: '000400'
+              owner: apache
+              group: apache
+            "/var/www/html/index.php":
+              content: !Sub |
+                <?php
+                echo '<h1>AWS CloudFormation sample PHP application for ${AWS::StackName}</h1>';
+                ?>
+              mode: '000644'
+              owner: apache
+              group: apache
+            "/etc/cfn/cfn-hup.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              mode: "000400"
+              owner: "root"
+              group: "root"
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.WebServerHost.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerHost --region ${AWS::Region}
+              mode: "000400"
+              owner: "root"
+              group: "root"
+            # Fetch a webpage from a private S3 bucket
+            "/var/www/html/webpage.html":
+              source: !Sub "https://${MyS3BucketName}.s3.${AWS::Region}.amazonaws.com/webpage.html"
+              mode: '000644'
+              owner: apache
+              group: apache
+              authentication: S3AccessCreds
+          commands:
+            test:
+              command: "echo \"$MAGIC\" > test.txt"
+              env:
+                MAGIC: "I come from the environment!"
+              cwd: "~"
+          services:
+            sysvinit:
+              httpd:
+                enabled: 'true'
+                ensureRunning: 'true'
+              postfix:
+                enabled: 'false'
+                ensureRunning: 'false'
+              cfn-hup:
+                enable: 'true'
+                ensureRunning: 'true'
+                files:
+                  - "/etc/cfn/cfn-hup.conf"
+                  - "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+      AWS::CloudFormation::Authentication:
+        # Define S3 access credentials
+        S3AccessCreds:
+          type: S3
+          buckets:
+            - !Sub ${MyS3BucketName}
+          roleName: !Ref InstanceRole
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+        
+    Properties:
+      ImageId: !Ref ImageId
+      KeyName: !Ref KeyName
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref InstanceProfile # Reference Instance Profile
+      SecurityGroups:
+      - !Ref WebServerSecurityGroup
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            
+            # Get the latest CloudFormation helper scripts
+            yum install -y aws-cfn-bootstrap
+            
+            # Start cfn-init
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerHost --region ${AWS::Region}
+            
+            # cfn-init completed so signal success or not
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource WebServerHost --region ${AWS::Region}
+          
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Principal:
+              Service: ec2.amazonaws.com
+            Effect: Allow
+            Sid: ''
+      Policies:
+        - PolicyName: AuthenticatedS3GetObjects
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:GetObject'
+                Resource: !Sub 'arn:aws:s3:::${MyS3BucketName}/*'
+                Effect: Allow
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
+
+Outputs:
+  InstanceId:
+    Description: The instance ID of the web server
+    Value:
+      !Ref WebServerHost
+  WebsiteURL:
+    Value:
+      !Sub 'http://${WebServerHost.PublicDnsName}'
+    Description: URL for newly created LAMP stack
+  PublicIP:
+    Description: Public IP address of the web server
+    Value:
+      !GetAtt WebServerHost.PublicIp
+###############################################################################
+Parameters:
+  ApplicationName:
+    Description: The application name
+    Type: String
+  VPCId:
+    Description: VPC to create the security group into
+    Type: AWS::EC2::VPC::Id
+  
+Resources:
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub Security group for ${ApplicationName}
+      SecurityGroupIngress:
+        - CidrIp: "10.0.0.0/25"
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          Description: SSH for Engineering department
+        - CidrIp: "192.168.0.0/25"
+          FromPort: 22
+          ToPort: 22
+          IpProtocol: tcp
+          Description: SSH for HR department
+      VpcId: !Ref VPCId
+
+Outputs:
+  SSHGroupId:
+    Value: !Ref SSHSecurityGroup
+    Description: Id for the SSH Security Group
+
+
+
+
+Parameters:
+  VPCId:
+    Description: VPC to create the security group and EC2 instance into
+    Type: AWS::EC2::VPC::Id
+
+  TemplateURL:
+    Description: URL of the nested stack template
+    Type: String
+
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  SSHSecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref TemplateURL
+      Parameters:
+        ApplicationName: !Ref AWS::StackName
+        VPCId: !Ref VPCId
+      TimeoutInMinutes: 5
+
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      # Note we use the pseudo parameter AWS::Region
+      ImageId: !Ref ImageId
+      SecurityGroupIds:
+        - !GetAtt SSHSecurityGroupStack.Outputs.SSHGroupId
+
+############################################################################################################
+AWSTemplateFormatVersion: 2010-09-09
+Description: Enable AWS Config
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Recorder Configuration
+        Parameters:
+          - AllSupported
+          - IncludeGlobalResourceTypes
+          - ResourceTypes
+      - Label:
+          default: Delivery Channel Configuration
+        Parameters:
+          - DeliveryChannelName
+          - Frequency
+      - Label:
+          default: Delivery Notifications
+        Parameters:
+          - TopicArn
+          - NotificationEmail
+    ParameterLabels:
+      AllSupported:
+        default: Support all resource types
+      IncludeGlobalResourceTypes:
+        default: Include global resource types
+      ResourceTypes:
+        default: List of resource types if not all supported
+      DeliveryChannelName:
+        default: Configuration delivery channel name
+      Frequency:
+        default: Snapshot delivery frequency
+      TopicArn:
+        default: SNS topic name
+      NotificationEmail:
+        default: Notification Email (optional)
+
+Parameters:
+  AllSupported:
+    Type: String
+    Default: True
+    Description: Indicates whether to record all supported resource types.
+    AllowedValues:
+      - True
+      - False
+
+  IncludeGlobalResourceTypes:
+    Type: String
+    Default: True
+    Description: Indicates whether AWS Config records all supported global resource types.
+    AllowedValues:
+      - True
+      - False
+
+  ResourceTypes:
+    Type: List<String>
+    Description: A list of valid AWS resource types to include in this recording group, such as AWS::EC2::Instance or AWS::CloudTrail::Trail.
+    Default: <All>
+
+  DeliveryChannelName:
+    Type: String
+    Default: <Generated>
+    Description: The name of the delivery channel.
+
+  Frequency:
+    Type: String
+    Default: 24hours
+    Description: The frequency with which AWS Config delivers configuration snapshots.
+    AllowedValues:
+      - 1hour
+      - 3hours
+      - 6hours
+      - 12hours
+      - 24hours
+
+  TopicArn:
+    Type: String
+    Default: <New Topic>
+    Description: The Amazon Resource Name (ARN) of the Amazon Simple Notification Service (Amazon SNS) topic that AWS Config delivers notifications to.
+
+  NotificationEmail:
+    Type: String
+    Default: <None>
+    Description: Email address for AWS Config notifications (for new topics).
+
+Conditions:
+  IsAllSupported: !Equals
+    - !Ref AllSupported
+    - True
+  IsGeneratedDeliveryChannelName: !Equals
+    - !Ref DeliveryChannelName
+    - <Generated>
+  CreateTopic: !Equals
+    - !Ref TopicArn
+    - <New Topic>
+  CreateSubscription: !And
+    - !Condition CreateTopic
+    - !Not
+      - !Equals
+        - !Ref NotificationEmail
+        - <None>
+
+Mappings:
+  Settings:
+    FrequencyMap:
+      1hour   : One_Hour
+      3hours  : Three_Hours
+      6hours  : Six_Hours
+      12hours : Twelve_Hours
+      24hours : TwentyFour_Hours
+
+Resources:
+
+  ConfigBucket:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AWSConfigBucketPermissionsCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}"
+          - Sid: AWSConfigBucketDelivery
+            Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action: s3:PutObject
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${ConfigBucket}/AWSLogs/${AWS::AccountId}/*"
+
+  ConfigTopic:
+    Condition: CreateTopic
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "config-topic-${AWS::AccountId}"
+      DisplayName: AWS Config Notification Topic
+
+  ConfigTopicPolicy:
+    Condition: CreateTopic
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref ConfigTopic
+      PolicyDocument:
+        Statement:
+          - Sid: AWSConfigSNSPolicy
+            Action:
+              - sns:Publish
+            Effect: Allow
+            Resource: !Ref ConfigTopic
+            Principal:
+              Service:
+                - config.amazonaws.com
+
+  EmailNotification:
+    Condition: CreateSubscription
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref NotificationEmail
+      Protocol: email
+      TopicArn: !Ref ConfigTopic
+
+  ConfigRecorderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - config.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWS_ConfigRole"
+
+  ConfigRecorder:
+    Type: AWS::Config::ConfigurationRecorder
+    DependsOn:
+      - ConfigBucketPolicy
+    Properties:
+      RoleARN: !GetAtt ConfigRecorderRole.Arn
+      RecordingGroup:
+        AllSupported: !Ref AllSupported
+        IncludeGlobalResourceTypes: !Ref IncludeGlobalResourceTypes
+        ResourceTypes: !If
+          - IsAllSupported
+          - !Ref AWS::NoValue
+          - !Ref ResourceTypes
+
+  ConfigDeliveryChannel:
+    Type: AWS::Config::DeliveryChannel
+    DependsOn:
+      - ConfigBucketPolicy
+    Properties:
+      Name: !If
+        - IsGeneratedDeliveryChannelName
+        - !Ref AWS::NoValue
+        - !Ref DeliveryChannelName
+      ConfigSnapshotDeliveryProperties:
+        DeliveryFrequency: !FindInMap
+          - Settings
+          - FrequencyMap
+          - !Ref Frequency
+      S3BucketName: !Ref ConfigBucket
+      SnsTopicARN: !If
+        - CreateTopic
+        - !Ref ConfigTopic
+        - !Ref TopicArn
+
+
+
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Configure the AWSCloudFormationStackSetExecutionRole to enable use of your account as a target account in AWS CloudFormation StackSets.
+
+Parameters:
+  AdministratorAccountId:
+    Type: String
+    Description: AWS Account Id of the administrator account (the account in which StackSets will be created).
+    MaxLength: 12
+    MinLength: 12
+
+Resources:
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSCloudFormationStackSetExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AdministratorAccountId
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess
+
+
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Configure the AWSCloudFormationStackSetAdministrationRole to enable use of AWS CloudFormation StackSets.
+
+Resources:
+  AdministrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSCloudFormationStackSetAdministrationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: AssumeRole-AWSCloudFormationStackSetExecutionRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - "arn:*:iam::*:role/AWSCloudFormationStackSetExecutionRole"
