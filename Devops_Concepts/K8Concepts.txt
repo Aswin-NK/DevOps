@@ -1,0 +1,23 @@
+
+Drawbacks of Docker-Auto Healing/Auto Scaling/Big Enterprise
+Kubernetes Architect
+Components
+Control Plane---API server/etcd/scheduler/CCM
+Data Plane--Kubelet/Kube Proxy/Container Runtime
+Services in kubernetes - Clsuter IP Node/Node IP/Loadbalancer
+
+Kubenetes Commands:
+minikube start Kubectl-------------->single node kubernetes cluster
+Kubectl get all -A------get all details 
+kubectl get nodes/Kubectl get nodes -o wide
+kubectl create -f pod.yml
+kubectl log podname
+kubectl apply -f pod.yml 
+kubectl apply -f deployment.yml 
+kubectl describe podname
+kubectl delete pod name
+kubectl get rs-------replica set
+ssh -i <Identifier> <node ip > for cluster login.
+Kubectl get deploy
+Kubectl delete deploy <name> ------If deploy gets deleted then pods are deleted.
+

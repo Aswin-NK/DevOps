@@ -1,0 +1,10 @@
+Terraform as IaC 
+
+Block->Terraform/Providers(AWS)/Resource/Module(Public Registry)
+Variable/Conditions/Outputs
+tfstate
+Backend Block-Configure S3 external storage and dynamo db table as state locking
+Local execute and Remote execute
+Workspace- Staging Deployment
+Import
+

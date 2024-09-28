@@ -1,0 +1,25 @@
+To overcome of VM we introduced Docker such as images,container---as it is Lightweight,Workflow reduction,Efficiency
+Docker LifeCycle 
+1. docker build -> builds docker images from Dockerfile
+2. docker run   -> runs container from docker images
+3. docker push  -> push the container image to public/private regestries to share the docker images.
+What is a container ?
+What is Docker ?
+Docker Images
+Docker registries
+Docker daemon
+Volume and its networks
+distroless images----->Very minimal configuration 
+
+Docker Commands
+docker ps
+docker stop/docker start
+docker login
+docker images-docker build -t aswin/my-first-docker-image:latest
+docker container-docker run hello-world
+docker exec
+docker volume ls ------Docker Volume Description
+docker volume rm 
+docker network  Docker Networks
+docker push aswin/my-first-docker-image
+docker pull aswin/my-first-docker-image
