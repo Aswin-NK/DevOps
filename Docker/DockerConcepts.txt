@@ -19,7 +19,11 @@ docker images-docker build -t aswin/my-first-docker-image:latest
 docker container-docker run hello-world
 docker exec
 docker volume ls ------Docker Volume Description
+docker run -d --mount source aswin target=/app <image details>
 docker volume rm 
 docker network  Docker Networks
+docker run -d --name container3 --network=secure-network image1
+docker run -d --name container4 --network=host image1
+docker run -d --name container2 image1
 docker push aswin/my-first-docker-image
 docker pull aswin/my-first-docker-image
