@@ -1,0 +1,431 @@
+#! /bin/bash
+# Instance Identity Metadata Reference - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
+sudo yum update -y
+sudo yum install -y httpd
+sudo systemctl enable httpd
+sudo service httpd start  
+sudo echo '<h1>Welcome to StackSimplify - APP-1</h1>' | sudo tee /var/www/html/index.html
+sudo mkdir /var/www/html/app1
+sudo echo '<!DOCTYPE html> <html> <body style="background-color:rgb(250, 210, 210);"> <h1>Welcome to Stack Simplify - APP-1</h1> <p>Terraform Demo</p> <p>Application Version: V1</p> </body></html>' | sudo tee /var/www/html/app1/index.html
+#sudo curl http://169.254.169.254/latest/dynamic/instance-identity/document -o /var/www/html/app1/metadata.html
+TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+sudo curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/dynamic/instance-identity/document -o /var/www/html/app1/metadata.html
+# AWS Documentation to retrieve EC2 Instance Data
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
+
+
+
+
+# Terraform Block
+terraform {
+  required_version = ">= 1.6" # which means any version equal & above 0.14 like 0.15, 0.16 etc and < 1.xx
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
+
+# Provider Block
+provider "aws" {
+  region  = var.aws_region
+}
+/*
+Note-1:  AWS Credentials Profile (profile = "default") configured on your local desktop terminal  
+$HOME/.aws/credentials
+*/
+
+
+
+# Input Variables
+# AWS Region
+variable "aws_region" {
+  description = "Region in which AWS Resources to be created"
+  type = string
+  default = "us-east-1"
+}
+
+# AWS EC2 Instance Type
+variable "instance_type" {
+  description = "EC2 Instnace Type"
+  type = string
+  default = "t3.micro"
+}
+
+# AWS EC2 Instance Key Pair
+variable "instance_keypair" {
+  description = "AWS EC2 Key Pair that need to be associated with EC2 Instance"
+  type = string
+  default = "terraform-key"
+}
+
+
+# Create Security Group - SSH Traffic
+resource "aws_security_group" "vpc-ssh" {
+  name        = "vpc-ssh"
+  description = "Dev VPC SSH"
+  ingress {
+    description = "Allow Port 22"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Allow all ip and ports outbound"    
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "vpc-ssh"
+  }
+}
+
+# Create Security Group - Web Traffic
+resource "aws_security_group" "vpc-web" {
+  name        = "vpc-web"
+  description = "Dev VPC Web"
+  ingress {
+    description = "Allow Port 80"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    description = "Allow Port 443"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }  
+  egress {
+    description = "Allow all ip and ports outbound"    
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "vpc-web"
+  }
+}
+
+
+
+
+# Get latest AMI ID for Amazon Linux2 OS
+data "aws_ami" "amzlinux2" {
+  most_recent      = true
+  owners           = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-gp2"]
+  }
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
+
+
+# EC2 Instance
+resource "aws_instance" "myec2vm" {
+  ami = data.aws_ami.amzlinux2.id
+  instance_type = var.instance_type
+  user_data = file("${path.module}/app1-install.sh")
+  key_name = var.instance_keypair
+  vpc_security_group_ids = [ aws_security_group.vpc-ssh.id, aws_security_group.vpc-web.id   ]
+  tags = {
+    "Name" = "EC2 Demo 2"
+  }
+}
+
+
+
+# Terraform Output Values
+
+# EC2 Instance Public IP
+output "instance_publicip" {
+  description = "EC2 Instance Public IP"
+  value = aws_instance.myec2vm.public_ip
+}
+
+# EC2 Instance Public DNS
+output "instance_publicdns" {
+  description = "EC2 Instance Public DNS"
+  value = aws_instance.myec2vm.public_dns
+}
+
+
+###########################################################################
+Count
+# EC2 Instance
+resource "aws_instance" "myec2vm" {
+  ami = data.aws_ami.amzlinux2.id
+  instance_type = var.instance_type
+  #instance_type = var.instance_type_list[1]  # For List
+  #instance_type = var.instance_type_map["prod"]  # For Map
+  user_data = file("${path.module}/app1-install.sh")
+  key_name = var.instance_keypair
+  vpc_security_group_ids = [ aws_security_group.vpc-ssh.id, aws_security_group.vpc-web.id   ]
+  count = 2
+  tags = {
+    "Name" = "Count-Demo-${count.index}"
+  }
+}
+
+/*
+# Drawbacks of using count in this example
+- Resource Instances in this case were identified using index numbers 
+instead of string values like actual subnet_id
+- If an element was removed from the middle of the list, 
+every instance after that element would see its subnet_id value 
+change, resulting in more remote object changes than intended. 
+- Even the subnet_ids should be pre-defined or we need to get them again 
+using for_each or for using various datasources
+- Using for_each gives the same flexibility without the extra churn.
+*/
+
+
+# Terraform Output Values
+/* Concepts Covered
+1. For Loop with List
+2. For Loop with Map
+3. For Loop with Map Advanced
+4. Legacy Splat Operator (latest) - Returns List
+5. Latest Generalized Splat Operator - Returns the List
+*/
+
+# Output - For Loop with List
+output "for_output_list" {
+  description = "For Loop with List"
+  value = [for instance in aws_instance.myec2vm: instance.public_dns]
+}
+
+# Output - For Loop with Map
+output "for_output_map1" {
+  description = "For Loop with Map"
+  value = {for instance in aws_instance.myec2vm: instance.id => instance.public_dns}
+}
+
+# Output - For Loop with Map Advanced
+output "for_output_map2" {
+  description = "For Loop with Map - Advanced"
+  value = {for c, instance in aws_instance.myec2vm: c => instance.public_dns}
+}
+
+# Output Legacy Splat Operator (Legacy) - Returns the List
+/*
+output "legacy_splat_instance_publicdns" {
+  description = "Legacy Splat Operator"
+  value = aws_instance.myec2vm.*.public_dns
+}
+*/
+
+# Output Latest Generalized Splat Operator - Returns the List
+output "latest_splat_instance_publicdns" {
+  description = "Generalized latest Splat Operator"
+  value = aws_instance.myec2vm[*].public_dns
+}
+
+#####################################################################
+For Each
+
+# Availability Zones Datasource
+data "aws_availability_zones" "my_azones" {
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+}
+
+
+# EC2 Instance
+resource "aws_instance" "myec2vm" {
+  ami = data.aws_ami.amzlinux2.id
+  instance_type = var.instance_type
+  user_data = file("${path.module}/app1-install.sh")
+  key_name = var.instance_keypair
+  vpc_security_group_ids = [ aws_security_group.vpc-ssh.id, aws_security_group.vpc-web.id   ]
+  # Create EC2 Instance in all Availabilty Zones of a VPC  
+  for_each = toset(data.aws_availability_zones.my_azones.names)
+  availability_zone = each.key  # You can also use each.value because for list items each.key == each.value
+  tags = {
+    "Name" = "for_each-Demo-${each.value}"
+  }
+}
+
+
+
+
+# Terraform Output Values
+
+
+# EC2 Instance Public IP with TOSET
+output "instance_publicip" {
+  description = "EC2 Instance Public IP"
+  #value = aws_instance.myec2vm.*.public_ip   # Legacy Splat
+  #value = aws_instance.myec2vm[*].public_ip  # Latest Splat
+  value = toset([for instance in aws_instance.myec2vm: instance.public_ip])
+}
+
+# EC2 Instance Public DNS with TOSET
+output "instance_publicdns" {
+  description = "EC2 Instance Public DNS"
+  #value = aws_instance.myec2vm[*].public_dns  # Legacy Splat
+  #value = aws_instance.myec2vm[*].public_dns  # Latest Splat
+  value = toset([for instance in aws_instance.myec2vm: instance.public_dns])
+}
+
+# EC2 Instance Public DNS with TOMAP
+output "instance_publicdns2" {
+  value = tomap({for az, instance in aws_instance.myec2vm: az => instance.public_dns})
+}
+
+
+/*
+# Additional Important Note about OUTPUTS when for_each used
+1. The [*] and .* operators are intended for use with lists only. 
+2. Because this resource uses for_each rather than count, 
+its value in other expressions is a toset or a map, not a list.
+3. With that said, we can use Function "toset" and loop with "for" 
+to get the output for a list
+4. For maps, we can directly use for loop to get the output and if we 
+want to handle type conversion we can use "tomap" function too 
+*/
+#####################################################################
+# Datasource
+data "aws_ec2_instance_type_offerings" "my_ins_type1" {
+  filter {
+    name   = "instance-type"
+    values = ["t3.micro"]
+  }
+  filter {
+    name   = "location"
+    #values = ["us-east-1a"]
+    values = ["us-east-1e"]
+  }
+  location_type = "availability-zone"
+}
+
+
+# Output
+output "output_v1_1" {
+  value = data.aws_ec2_instance_type_offerings.my_ins_type1.instance_types
+}
+
+
+
+# Check if that respective Instance Type is supported in that Specific Region in list of availability Zones
+# Get the List of Availability Zones in a Particular region where that respective Instance Type is supported
+# Datasource
+data "aws_ec2_instance_type_offerings" "my_ins_type2" {
+  for_each = toset([ "us-east-1a", "us-east-1b", "us-east-1e" ])
+  filter {
+    name   = "instance-type"
+    values = ["t3.micro"]
+  }
+  filter {
+    name   = "location"
+    values = [each.key]
+  }
+  location_type = "availability-zone"
+}
+
+
+#Output-1
+# Important Note: Once for_each is set, its attributes must be accessed on specific instances
+output "output_v2_1" {
+  #value = data.aws_ec2_instance_type_offerings.my_ins_type1.instance_types
+  value = toset([for t in data.aws_ec2_instance_type_offerings.my_ins_type2: t.instance_types])
+}
+
+#Output-2
+# Create a Map with Key as Availability Zone and value as Instance Type supported
+output "output_v2_2" {
+  value = {
+    for az, details in data.aws_ec2_instance_type_offerings.my_ins_type2: az => details.instance_types
+  }
+}
+
+
+
+# Get List of Availability Zones in a Specific Region
+# Region is set in c1-versions.tf in Provider Block
+# Datasource-1
+data "aws_availability_zones" "my_azones" {
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+}
+
+# Check if that respective Instance Type is supported in that Specific Region in list of availability Zones
+# Get the List of Availability Zones in a Particular region where that respective Instance Type is supported
+# Datasource-2
+data "aws_ec2_instance_type_offerings" "my_ins_type" {
+  for_each = toset(data.aws_availability_zones.my_azones.names)
+  filter {
+    name   = "instance-type"
+    values = ["t3.micro"]
+  }
+  filter {
+    name   = "location"
+    values = [each.key]
+  }
+  location_type = "availability-zone"
+}
+
+
+# Output-1
+# Basic Output: All Availability Zones mapped to Supported Instance Types
+output "output_v3_1" {
+  value = {
+    for az, details in data.aws_ec2_instance_type_offerings.my_ins_type: az => details.instance_types
+  }
+}
+
+# Output-2
+# Filtered Output: Exclude Unsupported Availability Zones
+output "output_v3_2" {
+  value = {
+    for az, details in data.aws_ec2_instance_type_offerings.my_ins_type: 
+    az => details.instance_types if length(details.instance_types) != 0 }
+}
+
+# Output-3
+# Filtered Output: with Keys Function - Which gets keys from a Map
+# This will return the list of availability zones supported for a instance type
+output "output_v3_3" {
+  value = keys({
+    for az, details in data.aws_ec2_instance_type_offerings.my_ins_type: 
+    az => details.instance_types if length(details.instance_types) != 0 })
+}
+
+
+# Output-4 (additional learning)
+# Filtered Output: As the output is list now, get the first item from list (just for learning)
+output "output_v3_4" {
+  value = keys({
+    for az, details in data.aws_ec2_instance_type_offerings.my_ins_type: 
+    az => details.instance_types if length(details.instance_types) != 0 })[0]
+}
+
+
+#####################################################################

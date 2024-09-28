@@ -1,0 +1,480 @@
+provider "aws" {
+  region = "eu-west-2"
+}
+
+
+variable "vpcname" {
+  type    = string
+  default = "myvpc"
+}
+
+variable "sshport" {
+  type    = number
+  default = 22
+}
+
+variable "enabled" {
+  default = true
+}
+
+variable "mylist" {
+  type    = list(string)
+  default = ["Value1", "Value2"]
+}
+
+variable "mymap" {
+  type = map
+  default = {
+    Key1 = "Value1"
+    Key2 = "Value2"
+  }
+}
+
+variable "inputname" {
+  type        = string
+  description = "Set the name of the VPC"
+}
+
+resource "aws_vpc" "myvpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = var.inputname
+  }
+}
+
+output "vpcid" {
+  value = aws_vpc.myvpc.id
+}
+
+variable "mytuple" {
+  type    = tuple([string, number, string])
+  default = ["cat", 1, "dog"]
+}
+
+variable "myobject" {
+  type = object({ name = string, port = list(number) })
+  default = {
+    name = "TJ"
+    port = [22, 25, 80]
+  }
+}
+
+###################################################################
+provider "aws" {
+    region = "eu-west-2"
+}
+
+resource "aws_vpc" "challenge1vpc" {
+    cidr_block = "192.168.0.0/24"
+    tags = {
+        Name = "TerraformVPC"
+    }
+}
+###################################################################
+provider "aws" {
+    region = "eu-west-2"
+}
+
+resource "aws_instance" "db" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+
+    tags = {
+        Name = "DB Server"
+    }
+}
+
+resource "aws_instance" "web" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    security_groups = [aws_security_group.web_traffic.name]
+    user_data = file("server-script.sh")
+    tags = {
+        Name = "Web Server"
+    }
+}
+
+resource "aws_eip" "web_ip" {
+    instance = aws_instance.web.id
+}
+
+variable "ingress" {
+    type = list(number)
+    default = [80,443]
+}
+
+variable "egress" {
+    type = list(number)
+    default = [80,443]
+}
+
+resource "aws_security_group" "web_traffic" {
+    name = "Allow Web Traffic"
+
+    dynamic "ingress" {
+        iterator = port
+        for_each = var.ingress
+        content {
+            from_port = port.value
+            to_port = port. value
+            protocol = "TCP"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+    }
+
+        dynamic "egress" {
+        iterator = port
+        for_each = var.egress
+        content {
+            from_port = port.value
+            to_port = port. value
+            protocol = "TCP"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+    }
+}
+
+output "PrivateIP" {
+    value = aws_instance.db.private_ip
+}
+
+output "PublicIP" {
+    value = aws_eip.web_ip.public_ip
+}
+###################################################################
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+module "db" {
+    source = "./db"
+    
+}
+
+module "web" {
+    source = "./web"  
+}
+
+output "PrivateIP" {
+    value = module.db.PrivateIP
+}
+
+output "PublicIP" {
+    value = module.web.pub_ip
+}
+
+db.tf
+
+resource "aws_instance" "db" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+
+    tags = {
+        Name = "DB Server"
+    }
+}
+
+output "PrivateIP" {
+    value = aws_instance.db.private_ip
+}
+
+
+eip.tf
+
+variable "instance_id" {
+    type = string
+}
+
+resource "aws_eip" "web_ip" {
+    instance = var.instance_id
+}
+
+output "PublicIP" {
+    value = aws_eip.web_ip.public_ip
+}
+
+sg.tf
+
+
+variable "ingress" {
+    type = list(number)
+    default = [80,443]
+}
+
+variable "egress" {
+    type = list(number)
+    default = [80,443]
+}
+
+output "sg_name" {
+    value = aws_security_group.web_traffic.name
+}
+
+resource "aws_security_group" "web_traffic" {
+    name = "Allow Web Traffic"
+
+    dynamic "ingress" {
+        iterator = port
+        for_each = var.ingress
+        content {
+            from_port = port.value
+            to_port = port. value
+            protocol = "TCP"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+    }
+
+        dynamic "egress" {
+        iterator = port
+        for_each = var.egress
+        content {
+            from_port = port.value
+            to_port = port. value
+            protocol = "TCP"
+            cidr_blocks = ["0.0.0.0/0"]
+        }
+    }
+}
+
+wweb.tf
+
+
+resource "aws_instance" "web" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    security_groups = [module.sg.sg_name]
+    user_data = file("./web/server-script.sh")
+    tags = {
+        Name = "Web Server"
+    }
+}
+
+output "pub_ip" {
+    value = module.eip.PublicIP
+}
+
+module "eip" {
+    source = "../eip"
+    instance_id = aws_instance.web.id
+}
+
+module "sg" {
+    source = "../sg"
+}
+
+###################################################################
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+variable "number_of_servers" {
+    type = number
+}
+
+resource "aws_instance" "ec2" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    count = var.number_of_servers
+}
+
+
+###################################################################
+
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+resource "aws_db_instance" "myRDS" {
+    db_name = "myDB"
+    identifier = "my-first-rds"
+    instance_class = "db.t2.micro"
+    engine = "mariadb"
+    engine_version = "10.2.21"
+    username = "bob"
+    password = "password123"
+    port = 3306
+    allocated_storage = 20
+    skip_final_snapshot = true
+
+}
+
+###################################################################
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+resource "aws_instance" "ec2" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    security_groups = [aws_security_group.webtraffic.name]
+}
+
+resource "aws_security_group" "webtraffic" {
+    name = "Allow HTTPS"
+
+    ingress {
+        from_port = 443
+        to_port = 443
+        protocol = "TCP"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress {
+        from_port = 443
+        to_port = 443
+        protocol = "TCP"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+}
+
+###################################################################
+
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+resource "aws_iam_user" "myUser" {
+    name = "TJ"
+}
+
+resource "aws_iam_policy" "customPolicy" {
+    name = "GlacierEFSEC2"
+
+    policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:ReplaceRouteTableAssociation",
+                "ec2:DeleteVpcEndpoints",
+                "ec2:ResetInstanceAttribute",
+                "ec2:ResetEbsDefaultKmsKeyId",
+                "ec2:AttachInternetGateway",
+                "ec2:ReportInstanceStatus",
+                "ec2:DeleteVpnGateway",
+                "ec2:CreateRoute",
+                "elasticfilesystem:ClientMount",
+                "glacier:PurchaseProvisionedCapacity",
+                "ec2:UnassignPrivateIpAddresses",
+                "ec2:CancelExportTask",
+                "ec2:DeleteTransitGatewayPeeringAttachment",
+                "ec2:ImportKeyPair",
+                "ec2:AssociateClientVpnTargetNetwork",
+                "ec2:StopInstances",
+                "ec2:CreateVolume",
+                "ec2:ReplaceNetworkAclAssociation",
+                "ec2:CreateVpcEndpointServiceConfiguration",
+                "ec2:CreateNetworkInterface",
+                "ec2:CancelSpotInstanceRequests",
+                "ec2:CreateTransitGatewayRoute",
+                "ec2:CreateTransitGatewayVpcAttachment",
+                "glacier:SetVaultNotifications",
+                "glacier:CompleteMultipartUpload",
+                "ec2:DeleteDhcpOptions",
+                "ec2:DeleteNatGateway",
+                "ec2:CancelCapacityReservation",
+                "ec2:EnableTransitGatewayRouteTablePropagation",
+                "glacier:ListVaults",
+                "ec2:ModifyVpcEndpoint",
+                "ec2:ModifyInstanceCapacityReservationAttributes",
+                "ec2:CreateVpnConnection",
+                "ec2:DeleteSpotDatafeedSubscription",
+                "ec2:ImportVolume",
+                "ec2:MoveAddressToVpc",
+                "ec2:ModifyFleet",
+                "ec2:RunScheduledInstances",
+                "ec2:ModifyIdentityIdFormat",
+                "ec2:CreateVpc",
+                "ec2:RequestSpotFleet",
+                "ec2:WithdrawByoipCidr",
+                "ec2:ReleaseHosts",
+                "ec2:DeleteTransitGatewayMulticastDomain",
+                "ec2:ModifySubnetAttribute",
+                "ec2:CreateSnapshot",
+                "ec2:DeleteLaunchTemplateVersions",
+                "ec2:DeleteNetworkAcl",
+                "ec2:ModifyReservedInstances",
+                "ec2:ReleaseAddress",
+                "ec2:ModifyInstanceMetadataOptions",
+                "ec2:AssociateDhcpOptions",
+                "ec2:ModifyInstancePlacement",
+                "ec2:CreateTrafficMirrorTarget",
+                "ec2:ModifyTrafficMirrorFilterRule",
+                "ec2:ResetFpgaImageAttribute"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_policy_attachment" "policyBind" {
+    name = "attachment"
+    users = [aws_iam_user.myUser.name]
+    policy_arn = aws_iam_policy.customPolicy.arn
+}
+
+###################################################################
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+variable "environment" {
+    type = string
+}
+
+resource "aws_instance" "ec2" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    count = var.environment == "prod" ? 1 : 0
+}
+
+
+###################################################################
+
+
+provider "aws" {
+    region = "eu-west-2"
+}
+
+module "db" {
+    source = "./db"
+    server_names = ["mariadb","mysql","mssql"]
+}
+
+output "private_ips" {
+    value = module.db.PrivateIP
+}
+
+db.tf
+
+variable "server_names" {
+    type = list(string)
+}
+
+resource "aws_instance" "db" {
+    ami = "ami-032598fcc7e9d1c7a"
+    instance_type = "t2.micro"
+    count = length(var.server_names)
+    tags = {
+        Name = var.server_names[count.index]
+    }
+}
+
+output "PrivateIP" {
+    value = [aws_instance.db.*.private_ip]
+}
+
+###################################################################
